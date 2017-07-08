@@ -124,6 +124,8 @@ AC_ARG_ENABLE([all-handlers],
               [
                AS_IF([test "x$enable_sample_event_handler" != "xyes"],
                      [enable_sample_event_handler=no])
+							 AS_IF([test "x$enable_callstats_event_handler" != "xyes"],
+                     [enable_callstats_event_handler=no])
               ],
               [])
 
@@ -168,6 +170,13 @@ AC_ARG_ENABLE([sample-event-handler],
               [AS_IF([test "x$enable_sample_event_handler" != "xyes"],
                      [enable_sample_event_handler=no])],
               [enable_sample_event_handler=maybe])
+
+AC_ARG_ENABLE([callstats-event-handler],
+              [AS_HELP_STRING([--disable-callstats-event-handler],
+                              [Disable callstats event handler (HTTP POST) ])],
+              [AS_IF([test "x$enable_callstats_event_handler" != "xyes"],
+                     [enable_callstats_event_handler=no])],
+              [enable_callstats_event_handler=maybe])
 
 PKG_CHECK_MODULES([JANUS],
                   [
@@ -292,15 +301,24 @@ PKG_CHECK_MODULES([LIBCURL],
                         JANUS_MANUAL_LIBS+=" -lcurl"
                         enable_sample_event_handler=yes
                       ])
+										AS_IF([test "x$enable_callstats_event_handler" != "xno"],
+                      [
+                        AC_DEFINE(HAVE_CALLSTATSEVH)
+                        JANUS_MANUAL_LIBS+=" -lcurl"
+                        enable_callstats_event_handler=yes
+                      ])
                   ],
                   [
                     AS_IF([test "x$enable_turn_rest_api" = "xyes"],
                           [AC_MSG_ERROR([libcurl not found. See README.md for installation instructions or use --disable-turn-rest-api])])
                     AS_IF([test "x$enable_sample_event_handler" = "xyes"],
                           [AC_MSG_ERROR([libcurl not found. See README.md for installation instructions or use --disable-sample-event-handler])])
+                    AS_IF([test "x$enable_callstats_event_handler" = "xyes"],
+                          [AC_MSG_ERROR([libcurl not found. See README.md for installation instructions or use --disable-sample-event-handler])])
                   ])
 AM_CONDITIONAL([ENABLE_TURN_REST_API], [test "x$enable_turn_rest_api" = "xyes"])
 AM_CONDITIONAL([ENABLE_SAMPLEEVH], [test "x$enable_sample_event_handler" = "xyes"])
+AM_CONDITIONAL([ENABLE_CALLSTATSEVH], [test "x$enable_callstats_event_handler" = "xyes"])
 
 AC_CHECK_PROG([DOXYGEN],
               [doxygen],
@@ -680,6 +698,9 @@ echo "Event handlers:"
 AM_COND_IF([ENABLE_SAMPLEEVH],
 	[echo "    Sample event handler:  yes"],
 	[echo "    Sample event handler:  no"])
+AM_COND_IF([ENABLE_CALLSTATSEVH],
+	[echo "    Callstats event handler:  yes"],
+	[echo "    Callstats event handler:  no"])
 
 echo
 echo "If this configuration is ok for you, do a 'make' to start building Janus. A 'make install' will install Janus and its plugins to the specified prefix. Finally, a 'make configs' will install some sample configuration files too (something you'll only want to do the first time, though)."

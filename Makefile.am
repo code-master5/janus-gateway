@@ -267,6 +267,16 @@ conf_DATA += conf/janus.eventhandler.sampleevh.cfg.sample
 EXTRA_DIST += conf/janus.eventhandler.sampleevh.cfg.sample
 endif
 
+if ENABLE_CALLSTATSEVH
+event_LTLIBRARIES += events/libjanus_callstatsevh.la
+events_libjanus_callstatsevh_la_SOURCES = events/janus_callstatsevh.c
+events_libjanus_callstatsevh_la_CFLAGS = $(events_cflags)
+events_libjanus_callstatsevh_la_LDFLAGS = $(events_ldflags) -lcurl
+events_libjanus_callstatsevh_la_LIBADD = $(events_libadd)
+conf_DATA += conf/janus.eventhandler.callstatsevh.cfg.sample
+EXTRA_DIST += conf/janus.eventhandler.callstatsevh.cfg.sample
+endif
+
 ##
 # Plugins
 ##
