@@ -562,7 +562,8 @@ static void *janus_callstatsevh_handler(void *data) {
 			JANUS_LOG(LOG_ERR, "Error initializing CURL context\n");
 			goto done;
 		}
-		curl_easy_setopt(curl, CURLOPT_URL, backend);
+    curl_easy_setopt(curl, CURLOPT_URL, backend);
+		curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
 		headers = curl_slist_append(headers, "Accept: application/json");
 		headers = curl_slist_append(headers, "Content-Type: application/json");
 		headers = curl_slist_append(headers, "charsets: utf-8");
