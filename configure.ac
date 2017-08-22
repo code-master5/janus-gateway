@@ -304,7 +304,7 @@ PKG_CHECK_MODULES([LIBCURL],
 										AS_IF([test "x$enable_callstats_event_handler" != "xno"],
                       [
                         AC_DEFINE(HAVE_CALLSTATSEVH)
-                        JANUS_MANUAL_LIBS+=" -lcurl"
+                        JANUS_MANUAL_LIBS+=" -lcurl -lsqlite3"
                         enable_callstats_event_handler=yes
                       ])
                   ],

@@ -1,4 +1,4 @@
-ACLOCAL_AMFLAGS = -I m4
+# ACLOCAL_AMFLAGS = -I m4
 
 # FIXME: These flags should be produced in configure.ac using AX_APPEND_COMPILE_FLAGS
 AM_CFLAGS = \
@@ -271,7 +271,7 @@ if ENABLE_CALLSTATSEVH
 event_LTLIBRARIES += events/libjanus_callstatsevh.la
 events_libjanus_callstatsevh_la_SOURCES = events/janus_callstatsevh.c
 events_libjanus_callstatsevh_la_CFLAGS = $(events_cflags)
-events_libjanus_callstatsevh_la_LDFLAGS = $(events_ldflags) -lcurl
+events_libjanus_callstatsevh_la_LDFLAGS = $(events_ldflags) -lcurl -lsqlite3 -ljwt -ljansson
 events_libjanus_callstatsevh_la_LIBADD = $(events_libadd)
 conf_DATA += conf/janus.eventhandler.callstatsevh.cfg.sample
 EXTRA_DIST += conf/janus.eventhandler.callstatsevh.cfg.sample
