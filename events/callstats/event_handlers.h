@@ -1,18 +1,19 @@
 /*! \file    event_handlers.h
  * \author   Bimalkant Lauhny <lauhny.bimalk@gmail.com>
  * \copyright MIT License
- * \brief    Methods for handling events received from Janus 
+ * \brief    Methods for handling events received from Janus
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <jansson.h>
-#include "data_store.h" 
+#include <pthread.h>
+#include "data_store.h"
 #include "callstats.h"
 #include "../../utils.h"
 
-#define BUFFER_SIZE_EVH 100 
+#define BUFFER_SIZE_EVH 100
 
 // helper functions prototypes
 
@@ -36,7 +37,7 @@ void core_eventhandler(json_t *);
 // a function to convert a number to string
 char *to_string(gint64 num) {
     char *result  = (char *) malloc(BUFFER_SIZE_EVH);
-    sprintf(result, "%li", num); 
+    sprintf(result, "%li", num);
     return result;
 }
 
@@ -77,7 +78,7 @@ void session_eventhandler(json_t *event) {
     //extracting event details from 'event'
     json_t *event_key = json_object_get(event, "event");
 
-    // extracting event name ("attached" or "detached")    
+    // extracting event name ("attached" or "detached")
     json_t *evn = json_object_get(event_key, "name");
     const char *event_name = json_string_value(evn);
     printf("event name: %s\n", event_name);
@@ -86,21 +87,21 @@ void session_eventhandler(json_t *event) {
 // event handler for 'handle' events (type: 2)
 void handle_eventhandler(json_t *event) {
     // never free json_t* we get from json_object_get(), since we receive a borrowed reference
-    
+
     // extracting session_id
     json_t *sid =  json_object_get(event, "session_id");
     gint64 session_id = (gint64) json_number_value(sid);
     printf("session id : %li\n", session_id);
-    
+
     // extracting handle_id
     json_t *hid = json_object_get(event, "handle_id");
     gint64 handle_id = (gint64) json_number_value(hid);
     printf("handle id : %li\n", handle_id);
-    
+
     //extracting event details from 'event'
     json_t *event_key = json_object_get(event, "event");
 
-    // extracting event name ("attached" or "detached")    
+    // extracting event name ("attached" or "detached")
     json_t *evn = json_object_get(event_key, "name");
     const char *event_name = json_string_value(evn);
     printf("event name: %s\n", event_name);
@@ -113,14 +114,14 @@ void handle_eventhandler(json_t *event) {
         }
         const char *str_oid = json_string_value(jstr_oid);
         printf("opaque_id string: %s\n", str_oid);
-        json_error_t err; 
+        json_error_t err;
         json_t *opaque_id = json_loads(str_oid, 0, &err);
 
         // from opaque_id we get -
 
         // user_id
         json_t *uid = json_object_get(opaque_id, "user");
-        char *user_id = (char *) json_string_value(uid); 
+        char *user_id = (char *) json_string_value(uid);
         printf("user id : %s\n", user_id);
 
         // conf_id
@@ -137,19 +138,19 @@ void handle_eventhandler(json_t *event) {
         json_t *did = json_object_get(opaque_id, "deviceId");
         char *device_id = (char *) json_string_value(did);
         printf("device id: %s\n", device_id);
-       
+
 
         // setting up data for storing into data store
         // def - data_store.h
-        user_info user;      
-        
+        user_info user;
+
         // initializing user
         // def - data_store.h
         initialize_user_info(&user);
-        
+
         // assigning values to user
         user.user_id = user_id;
-        // since conf_id is part of post request urls, we will remove spaces from it 
+        // since conf_id is part of post request urls, we will remove spaces from it
         // def - event_handlers.h
         user.conf_id = without_spaces(conf_id);
         // conf_num, session_id and handle_id are numbers, we need to convert
@@ -159,19 +160,19 @@ void handle_eventhandler(json_t *event) {
         user.device_id = device_id;
         user.session_id = to_string(session_id);
         user.handle_id = to_string(handle_id);
-        
+
         // storing user info in data store
         // def - data_store.h
-        insert_userinfo(&user); 
-        
+        insert_userinfo(&user);
+
         // get auth token for the user
         // def - callstats.h
-        char *token = callstats_authenticate(user_id); 
-        
+        char *token = callstats_authenticate(user_id);
+
         // add token to user
         // def - data_store.h
         add_token(user.session_id, user.handle_id, token);
-        
+
         // freeing up data after data is stored successfully
         free(user.conf_id);
         free(user.conf_num);
@@ -198,6 +199,32 @@ void media_eventhandler(json_t *event) {
 
 }
 
+void *user_alive(void *user) {
+    gint8 rows = get_user_info(((user_info *)user)->session_id,
+                               ((user_info *)user)->handle_id,
+                               (user_info*)user);
+    while(rows > 0) {
+        // Starting user_alive event
+        // def - callstats.h
+        gint8 rc = callstats_user_alive((user_info *)user, janus_get_real_time());
+        if (rc == TRUE) {
+            printf("SUCCESS: userAlive successfull!\n");
+            g_usleep(10 * 1000000);
+        } else {
+            printf("ERROR: userAlive failed!\n");
+            g_usleep(1000000);
+        }
+        //fetch user info for a combination of session_id and handle_id from data store
+        // def - data_store.h
+        rows = get_user_info(((user_info *)user)->session_id,
+                             ((user_info *)user)->handle_id,
+                             (user_info *)user);
+    }
+    // free the memory allocated to user info in 'user'
+    // def - data_store.h
+    free_user_info((user_info *)user);
+}
+
 // event handler for 'plugin' events (type: 64)
 void plugin_eventhandler(json_t *event) {
     // extracting session_id
@@ -205,17 +232,17 @@ void plugin_eventhandler(json_t *event) {
     gint64 sess_id = (gint64) json_number_value(sid);
     printf("session id : %li\n", sess_id);
     char *session_id = to_string(sess_id);
-    
+
     // extracting handle_id
     json_t *hid = json_object_get(event, "handle_id");
     gint64 hand_id = (gint64) json_number_value(hid);
     printf("handle id : %li\n", hand_id);
     char *handle_id = to_string(hand_id);
-    
-    // extracting timestamp 
+
+    // extracting timestamp
     json_t *t_stamp = json_object_get(event, "timestamp");
     gint64 timestamp = (gint64) json_number_value(t_stamp);
-        
+
     //extracting event details from 'event'
     json_t *event_key = json_object_get(event, "event");
 
@@ -226,7 +253,7 @@ void plugin_eventhandler(json_t *event) {
     json_t *evn = json_object_get(data, "event");
     const char *event_name = json_string_value(evn);
     printf("event name: %s\n", event_name);
-    
+
     if (strcmp(event_name, "joined") == 0) {
         // extracting 'user_num'
         json_t *unum = json_object_get(data, "id");
@@ -245,7 +272,7 @@ void plugin_eventhandler(json_t *event) {
         // initializing user fields with NULL
         // def - data_store.h
         initialize_user_info(&user);
-        
+
         //fetch user info for a combination of session_id and handle_id from data store
         // def - data_store.h
         gint8 rows = get_user_info(session_id, handle_id, &user);
@@ -253,7 +280,7 @@ void plugin_eventhandler(json_t *event) {
         // send user-join request to callstats REST API
         // def - callstats.h
         char *uc_id  = callstats_user_joined(&user, timestamp);
-        
+
         // Adding uc_id to data store
         // def - data-store.h
         rc = add_uc_id(session_id, handle_id, uc_id);
@@ -261,32 +288,21 @@ void plugin_eventhandler(json_t *event) {
             printf("ERROR: Failed adding uc_id!\n");
         }
         free(uc_id);
-          
-        while(rows > 0) {
-          // Starting user_alive event
-          // def - callstats.h
-          rc = callstats_user_alive(&user, janus_get_real_time());
-          if (rc == TRUE) {
-            printf("SUCCESS: userAlive successfull!\n");
-            g_usleep(10 * 1000000);
-          } else {
-            printf("ERROR: userAlive failed!\n");
-            g_usleep(1000000);
-          }
-          //fetch user info for a combination of session_id and handle_id from data store
-          // def - data_store.h
-          rows = get_user_info(session_id, handle_id, &user);
+
+        // create a user_alive thread
+        pthread_t tid;
+        gint8 err = pthread_create(&tid, NULL, &user_alive, &user);
+        if (err != 0) {
+            printf("\nCan't create User Alive thread :[%s]", strerror(err));
+        } else {
+            printf("\n User Alive thread created successfully\n");
         }
-        // free the memory allocated to user info in 'user'
-        // def - data_store.h
-        free_user_info(&user);
-        
     } else if (strcmp(event_name, "unpublished") == 0) {
         user_info user;
         // initializing user fields with NULL
         // def - data_store.h
         initialize_user_info(&user);
-        
+
         //fetch user info for a combination of session_id and handle_id from data store
         // def - data_store.h
         gint8 rows = get_user_info(session_id, handle_id, &user);
@@ -318,9 +334,9 @@ void transport_eventhandler(json_t *event) {
 
 // event handler for 'core' events (type: 256)
 void core_eventhandler(json_t *event) {
-    json_t *event_key = json_object_get(event, "event"); 
+    json_t *event_key = json_object_get(event, "event");
     json_t *json_status = json_object_get(event_key, "status");
-    const char *status = json_string_value(json_status); 
+    const char *status = json_string_value(json_status);
     if (strcmp(status, "started") == 0) {
       // initializing database
       initialize_db();
