@@ -199,14 +199,15 @@ void media_eventhandler(json_t *event) {
 
 }
 
-void *user_alive(void *user) {
-    gint8 rows = get_user_info(((user_info *)user)->session_id,
-                               ((user_info *)user)->handle_id,
-                               (user_info*)user);
+gpointer *user_alive(gpointer user) {
+    user_info s_user = (user_info) user;
+    gint8 rows = get_user_info(s_user.session_id,
+                               s_user.handle_id,
+                               &s_user);
     while(rows > 0) {
         // Starting user_alive event
         // def - callstats.h
-        gint8 rc = callstats_user_alive((user_info *)user, janus_get_real_time());
+        gint8 rc = callstats_user_alive(s_user, janus_get_real_time());
         if (rc == TRUE) {
             printf("SUCCESS: userAlive successfull!\n");
             g_usleep(10 * 1000000);
@@ -216,13 +217,13 @@ void *user_alive(void *user) {
         }
         //fetch user info for a combination of session_id and handle_id from data store
         // def - data_store.h
-        rows = get_user_info(((user_info *)user)->session_id,
-                             ((user_info *)user)->handle_id,
-                             (user_info *)user);
+        rows = get_user_info(s_user.session_id,
+                             s_user.handle_id,
+                             &s_user);
     }
     // free the memory allocated to user info in 'user'
     // def - data_store.h
-    free_user_info((user_info *)user);
+    free_user_info(&s_user);
 }
 
 // event handler for 'plugin' events (type: 64)
@@ -290,10 +291,10 @@ void plugin_eventhandler(json_t *event) {
         free(uc_id);
 
         // create a user_alive thread
-        pthread_t tid;
-        gint8 err = pthread_create(&tid, NULL, &user_alive, &user);
-        if (err != 0) {
-            printf("\nCan't create User Alive thread :[%s]", strerror(err));
+        GError *error = NULL;
+        GThread *thread = g_thread_try_new(NULL, user_alive, (gpointer)user, &error);
+        if (error == NULL) {
+            printf("\nCan't create User Alive thread :[%s]", strerror(error));
         } else {
             printf("\n User Alive thread created successfully\n");
         }
